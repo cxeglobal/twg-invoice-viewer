@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Invoice Viewer</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#000;background:#fff;padding:30px}
+    .header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+    .logo{font-size:28px;font-weight:900}
+    .logo span{color:#E65D1C}
+    .inv-title{text-align:right}
+    .inv-title h1{font-size:28px;font-weight:900;color:#ccc}
+    .inv-title h1 span{color:#000}
+    .inv-title .customer{font-size:13px;font-weight:bold;letter-spacing:1px;color:#555}
+    .remit,.gst{font-size:11px;color:#333;margin-top:3px}
+    .addresses{display:flex;gap:60px;margin:16px 0}
+    .address-block h4{font-size:10px;color:#666;text-transform:uppercase;margin-bottom:4px}
+    .address-block p{font-size:12px;font-weight:bold;line-height:1.7}
+    table{width:100%;border-collapse:collapse;margin:12px 0}
+    th{background:#f0c00a;font-size:10px;text-transform:uppercase;padding:5px 8px;border:1px solid #ccc;text-align:center}
+    td{padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:top}
+    .totals-wrap{display:flex;justify-content:flex-end;margin:8px 0 16px}
+    .totals-wrap table{width:260px}
+    .totals-wrap td{border:none;padding:3px 8px}
+    .totals-wrap td:last-child{text-align:right;font-weight:bold}
+    .grand td{font-size:13px;border-top:2px solid #000;padding-top:6px}
+    .footer{font-size:10px;color:#444;margin-top:16px;line-height:1.8;clear:both}
+    .warning{font-weight:bold;margin-bottom:6px}
+    .currency{font-size:10px;color:#666;margin-top:12px}
+    .print-btn{position:fixed;top:16px;right:16px;padding:9px 20px;background:#E65D1C;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    #loading{text-align:center;padding:60px;font-size:18px;color:#666}
+    @media print{.print-btn{display:none}}
+  </style>
+</head>
+<body>
+  <div id="loading">Loading invoice...</div>
+  <div id="content" style="display:none"></div>
+
+  <script>
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get('d');
+      if (!encoded) throw new Error('No data');
+
+      const data = JSON.parse(atob(decodeURIComponent(encoded)));
+      const h = data.header;
+      const b = data.bill_to;
+      const s = data.ship_to;
+      const r = data.remit_from;
+      const t = data.totals;
+
+      const linesHTML = data.lines.map(l => `
+        <tr>
+          <td>${l.qty_ordered}</td>
+          <td>${l.qty_shipped}</td>
+          <td>${l.qty_backorder}</td>
+          <td>${l.item_code}</td>
+          <td>${l.description}</td>
+          <td style="text-align:right">$${Number(l.unit_price).toFixed(2)}</td>
+          <td style="text-align:right">$${Number(l.amount).toFixed(2)}</td>
+        </tr>`).join('');
+
+      document.title = 'Invoice ' + h.invno;
+      document.getElementById('content').innerHTML = `
+        <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+        <div class="header-top">
+          <div>
+            <div class="logo">⓪ WHEEL<span>-1</span></div>
+            <div class="remit">${r.company_name}</div>
+            <div class="remit">${r.line1}</div>
+            <div class="remit">${r.line3}</div>
+            <div class="gst">GST/HST# 844909226 &nbsp; QST# 1223911567</div>
+          </div>
+          <div class="inv-title">
+            <h1>INVOICE <span>${h.invno}</span></h1>
+            <div class="customer">CUSTOMER &nbsp; ${h.custno}</div>
+          </div>
+        </div>
+        <div class="addresses">
+          <div class="address-block">
+            <h4>Bill To:</h4>
+            <p>${b.company}<br/>${b.address1}<br/>${b.city}, ${b.state} ${b.zip}<br/>${b.country}<br/>${b.phone || ''}</p>
+          </div>
+          <div class="address-block">
+            <h4>Ship To:</h4>
+            <p>${s.company}<br/>${s.address1}<br/>${s.city}, ${s.state} ${s.zip}<br/>${s.country}</p>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Ship Via</th><th>F.O.B.</th><th>Terms</th><th>Due Date</th></tr></thead>
+          <tbody><tr>
+            <td>${h.invoice_date}</td><td>${h.ship_via}</td><td>${h.fob}</td><td>${h.terms_code}</td><td>${h.due_date}</td>
+          </tr></tbody>
+        </table>
+        <table>
+          <thead><tr><th>Purchase Order Number</th><th>Order Date</th><th>Salesperson</th><th>Our Order Number</th></tr></thead>
+          <tbody><tr>
+            <td>${h.po_number}</td><td>${h.order_date || h.invoice_date}</td><td>${h.salesman}</td><td>${h.order_number}</td>
+          </tr></tbody>
+        </table>
+        <table>
+          <thead><tr><th>Req.</th><th>Ship</th><th>B.O.</th><th>Item Number</th><th>Description</th><th>Unit Price</th><th>Amount</th></tr></thead>
+          <tbody>${linesHTML}</tbody>
+        </table>
+        <div class="totals-wrap">
+          <table>
+            <tr><td>NonTaxable Subtotal</td><td>$${Number(t.non_taxable_subtotal).toFixed(2)}</td></tr>
+            <tr><td>Taxable Subtotal</td><td>$${Number(t.taxable_subtotal).toFixed(2)}</td></tr>
+            <tr><td>Tax</td><td>$${Number(t.tax_total).toFixed(2)}</td></tr>
+            <tr class="grand"><td><strong>Total Invoice</strong></td><td><strong>$${Number(t.grand_total).toFixed(2)}</strong></td></tr>
+          </table>
+        </div>
+        <div class="footer">
+          <p class="warning">***TEST FITMENT FIRST! MOUNTED WHEELS ARE NOT RETURNABLE!***</p>
+          <p><strong>Terms &amp; Conditions:</strong></p>
+          <p>1. All returns must have return authorization (RA number). Customer is responsible for return shipping. 20% restocking fee unless defective.</p>
+          <p>2. Returned merchandise must be in new/original condition unless defective. Credit memo issued for approved returns. <strong>NO REFUNDS!</strong></p>
+          <p>3. A finance charge of 1.5% per month will be charged to all past due accounts.</p>
+          <p>4. Venue and jurisdiction: City of Industry, Los Angeles County, State of California.</p>
+        </div>
+        <div class="currency">All prices, amounts, and totals are in ${h.currency}</div>
+      `;
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+
+    } catch(e) {
+      document.getElementById('loading').innerHTML = 'Error loading invoice. Please try again.';
+      console.error(e);
+    }
+  </script>
+</body>
+</html>
